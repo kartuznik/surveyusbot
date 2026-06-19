@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block title %}Ответы | SurveyBot Admin{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h1 class="h3 mb-1">Анкета #{{ survey.id }}</h1>
+        <div class="text-muted">{{ survey.title }}</div>
+    </div>
+    <div class="d-flex gap-2">
+        <a class="btn btn-outline-success" href="{{ url_for('export_csv', survey_id=survey.id) }}">Экспорт CSV</a>
+        <a class="btn btn-outline-secondary" href="{{ url_for('index') }}">Назад</a>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="table-responsive">
+        <table class="table table-striped mb-0">
+            <thead>
+                <tr>
+                    <th>user_id</th>
+                    <th>Вопрос</th>
+                    <th>Ответ</th>
+                    <th>Дата</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for row in rows %}
+                <tr>
+                    <td>{{ row.user_id }}</td>
+                    <td>{{ row.question }}</td>
+                    <td>{{ row.answer }}</td>
+                    <td>{{ row.created_at }}</td>
+                </tr>
+            {% else %}
+                <tr>
+                    <td colspan="4" class="text-center text-muted py-4">Ответов пока нет</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

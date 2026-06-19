@@ -1,0 +1,13 @@
+HEALTH_TITLE = {"ru": "Состояние системы", "en": "System Health"}
+BOT_STATUS = {"ru": "Статус бота", "en": "Bot status"}
+ONLINE = {"ru": "онлайн", "en": "online"}
+OFFLINE = {"ru": "офлайн", "en": "offline"}
+DB_LAST_CHECK = {"ru": "Последняя проверка БД", "en": "DB last check"}
+DB_STATUS = {"ru": "Статус БД", "en": "DB status"}
+OK = {"ru": "ок", "en": "ok"}
+DISK_FREE = {"ru": "Свободно на диске", "en": "Disk free in data"}
+ACTIVE_USERS = {"ru": "Активные пользователи", "en": "Active users"}
+UPTIME = {"ru": "Аптайм", "en": "Uptime"}
+LAST_HEAL = {"ru": "Последнее лечение", "en": "Last heal"}
+LAST_CRITICAL = {"ru": "Последняя критическая ошибка", "en": "Last critical"}
+N_A = {"ru": "н/д", "en": "n/a"}

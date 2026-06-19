@@ -1,0 +1,5 @@
+aiogram
+aiosqlite
+flask
+python-dotenv
+pydantic-settings

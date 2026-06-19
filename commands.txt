@@ -1,0 +1,12 @@
+# Commands for BotFather
+
+# Users
+start - Запустить бота
+help - Помощь
+create_survey - Создать анкету
+list_surveys - Мои анкеты
+
+# Admins
+health - Состояние системы (System Health)
+stats - Статистика
+broadcast - Рассылка
