@@ -1,5 +1,7 @@
 from datetime import UTC, datetime
 from typing import Any
+import logging
+from functools import wraps
 
 from aiogram import F, Router
 from aiogram.filters import Command
@@ -14,6 +16,7 @@ from aiogram.types import (
 )
 
 from bot.commands import export_commands_file
+from bot.diagnostics.error_tracker import get_error_tracker
 from bot.integrations.webhook import send_webhook
 from bot.keyboards import get_survey_list_keyboard
 from bot.roles import get_role_manager_instance
@@ -30,9 +33,28 @@ from database import (
 )
 
 router = Router()
+logger = logging.getLogger("surveybot.handlers.user")
+
+
+def safe_user_handler(fn):
+    @wraps(fn)
+    async def wrapper(event, *args, **kwargs):
+        try:
+            return await fn(event, *args, **kwargs)
+        except Exception as error:
+            logger.exception("User handler error in %s: %s", fn.__name__, error)
+            get_error_tracker().add_error("user_handler", str(error), "")
+            if isinstance(event, Message):
+                await event.answer("Внутренняя ошибка. Попробуйте позже.")
+            elif isinstance(event, CallbackQuery):
+                await event.answer("Внутренняя ошибка", show_alert=True)
+            return None
+
+    return wrapper
 
 
 @router.message(CommandStart())
+@safe_user_handler
 async def cmd_start(message: Message):
     send_webhook(
         "user_started",
@@ -58,6 +80,7 @@ async def cmd_start(message: Message):
 
 
 @router.message(Command("help"))
+@safe_user_handler
 async def cmd_help(message: Message):
     await message.answer(
         "Доступные команды:\n"
@@ -67,11 +90,13 @@ async def cmd_help(message: Message):
         "/create_survey - Создать анкету (owner/admin)\n"
         "/list_surveys - Список анкет (owner/admin)\n"
         "/health - Состояние системы (owner/admin)\n"
+        "/diagnostics - Диагностика стабильности (owner/admin)\n"
         "/export_commands - Выгрузить commands.txt для BotFather"
     )
 
 
 @router.message(Command("export_commands"))
+@safe_user_handler
 async def cmd_export_commands(message: Message):
     file_path = export_commands_file("commands.txt")
     await message.answer_document(
@@ -117,6 +142,7 @@ async def _send_current_question(message: Message, state: FSMContext) -> None:
 
 
 @router.callback_query(F.data.startswith("take_"))
+@safe_user_handler
 async def take_survey(callback: CallbackQuery, state: FSMContext):
     if callback.message is None or callback.from_user is None:
         await callback.answer("Не удалось начать анкету.")
@@ -154,6 +180,7 @@ async def take_survey(callback: CallbackQuery, state: FSMContext):
 
 
 @router.message(TakeSurveyStates.answering)
+@safe_user_handler
 async def process_answer(message: Message, state: FSMContext):
     if not message.text:
         await message.answer("Пожалуйста, отправьте ответ текстовым сообщением.")

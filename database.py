@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import json
+import asyncio
 from datetime import timedelta
 from pathlib import Path
 from typing import Any
@@ -50,8 +51,26 @@ async def get_db() -> aiosqlite.Connection:
     await connection.execute("PRAGMA journal_mode=WAL;")
     await connection.execute("PRAGMA foreign_keys=ON;")
     await connection.execute("PRAGMA synchronous=NORMAL;")
+    await connection.execute("PRAGMA busy_timeout=5000;")
 
     return connection
+
+
+async def _execute_with_retry(
+    db: aiosqlite.Connection,
+    query: str,
+    params: tuple[Any, ...] = (),
+    retries: int = 3,
+) -> aiosqlite.Cursor:
+    for attempt in range(1, retries + 1):
+        try:
+            return await db.execute(query, params)
+        except aiosqlite.OperationalError as error:
+            if "database is locked" in str(error).lower() and attempt < retries:
+                await asyncio.sleep(0.2 * attempt)
+                continue
+            raise
+    raise RuntimeError("Retry limit exceeded")
 
 
 async def init_db() -> None:
@@ -144,7 +163,8 @@ async def create_survey(title: str, description: str | None) -> int:
 
     db = await get_db()
     try:
-        await db.execute(
+        await _execute_with_retry(
+            db,
             """
             INSERT INTO surveys (title, description, is_active)
             VALUES (?, ?, 1)
@@ -180,7 +200,8 @@ async def add_question(
         row = await cursor.fetchone()
         next_order_index = int(row[0]) if row else 0
 
-        await db.execute(
+        await _execute_with_retry(
+            db,
             """
             INSERT INTO questions (
                 survey_id,
@@ -300,7 +321,8 @@ async def create_response(survey_id: int, user_id: int) -> int:
     try:
         internal_user_id = await _get_or_create_user_by_telegram_id(db, user_id)
 
-        await db.execute(
+        await _execute_with_retry(
+            db,
             """
             INSERT INTO responses (survey_id, user_id, status)
             VALUES (?, ?, 'in_progress')
@@ -322,7 +344,8 @@ async def save_answer(response_id: int, question_id: int, answer_text: str) -> N
 
     db = await get_db()
     try:
-        await db.execute(
+        await _execute_with_retry(
+            db,
             """
             INSERT INTO answers (response_id, question_id, answer_text)
             VALUES (?, ?, ?)
@@ -341,7 +364,8 @@ async def complete_response(response_id: int) -> None:
 
     db = await get_db()
     try:
-        await db.execute(
+        await _execute_with_retry(
+            db,
             """
             UPDATE responses
             SET status = 'completed', completed_at = CURRENT_TIMESTAMP

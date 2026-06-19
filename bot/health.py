@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 import aiosqlite
+import psutil
 from aiogram import Bot
 
 
@@ -39,6 +40,9 @@ class BotHealthMonitor:
         self.last_critical_error: str | None = None
         self.last_critical_at: datetime | None = None
         self.last_heal_at: datetime | None = None
+        self.base_memory_mb = self._memory_mb()
+        self.current_memory_mb = self.base_memory_mb
+        self.zombie_connections = 0
 
         self._stop_event = asyncio.Event()
         self._is_healing = False
@@ -159,6 +163,7 @@ class BotHealthMonitor:
         self.last_resources_check = datetime.now(tz=UTC)
         usage = shutil.disk_usage(self.data_dir)
         self.free_disk_bytes = usage.free
+        self.current_memory_mb = self._memory_mb()
         min_free_bytes = 100 * 1024 * 1024
         if usage.free < min_free_bytes:
             self._mark_critical("low_disk_space")
@@ -169,12 +174,49 @@ class BotHealthMonitor:
             )
             return False
 
+        if self.current_memory_mb > self.base_memory_mb * 2:
+            self._mark_critical("possible_memory_leak")
+            self._log(
+                logging.WARNING,
+                "RESOURCES",
+                f"Подозрение на утечку памяти: {self.current_memory_mb:.1f}MB "
+                f"(base {self.base_memory_mb:.1f}MB)",
+            )
+
+        self.zombie_connections = await self._check_zombie_connections()
+        if self.zombie_connections > 0:
+            self._log(
+                logging.WARNING,
+                "DB",
+                f"Обнаружены потенциальные zombie connections: {self.zombie_connections}",
+            )
+            await self._cleanup_old_sessions()
+
         self._log(
             logging.INFO,
             "RESOURCES",
             f"Ресурсы в норме, свободно {usage.free // (1024 * 1024)}MB",
         )
         return True
+
+    def _memory_mb(self) -> float:
+        return float(psutil.Process().memory_info().rss) / (1024 * 1024)
+
+    async def _check_zombie_connections(self) -> int:
+        try:
+            db = await aiosqlite.connect(self.db_path)
+            await db.execute("PRAGMA wal_checkpoint(PASSIVE)")
+            await db.close()
+            return 0
+        except Exception:
+            return 1
+
+    async def _cleanup_old_sessions(self) -> None:
+        try:
+            await self.bot.session.close()
+            self._log(logging.INFO, "HEAL", "Выполнена очистка старых сессий")
+        except Exception as error:
+            self._log(logging.ERROR, "HEAL", f"Не удалось очистить сессии: {error}")
 
     def _mark_critical(self, reason: str) -> None:
         self.last_critical_error = reason
@@ -302,6 +344,9 @@ class BotHealthMonitor:
             "last_critical_error": self.last_critical_error,
             "last_critical_at": self.last_critical_at,
             "last_heal_at": self.last_heal_at,
+            "memory_mb": self.current_memory_mb,
+            "base_memory_mb": self.base_memory_mb,
+            "zombie_connections": self.zombie_connections,
         }
 
 

@@ -22,6 +22,7 @@ ADMIN_COMMANDS: list[tuple[str, str]] = [
     ("create_survey", "Создать анкету"),
     ("list_surveys", "Мои анкеты"),
     ("health", "Состояние системы (System Health)"),
+    ("diagnostics", "Диагностика стабильности"),
     ("stats", "Статистика"),
     ("broadcast", "Рассылка"),
     ("broadcast_dry", "Рассылка dry-run"),

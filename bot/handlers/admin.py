@@ -4,22 +4,45 @@ from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
+import logging
+from functools import wraps
 
+from bot.diagnostics.error_tracker import get_error_tracker
 from bot.integrations.webhook import send_webhook
 from bot.keyboards import get_question_type_keyboard
 from bot.states import CreateSurveyStates
 from database import add_question, create_survey, get_active_surveys
 
 router = Router()
+logger = logging.getLogger("surveybot.handlers.admin")
+
+
+def safe_admin_handler(fn):
+    @wraps(fn)
+    async def wrapper(event, *args, **kwargs):
+        try:
+            return await fn(event, *args, **kwargs)
+        except Exception as error:
+            logger.exception("Admin handler error in %s: %s", fn.__name__, error)
+            get_error_tracker().add_error("admin_handler", str(error), "")
+            if isinstance(event, Message):
+                await event.answer("Внутренняя ошибка администратора. Попробуйте позже.")
+            elif isinstance(event, CallbackQuery) and event.message:
+                await event.message.answer("Внутренняя ошибка администратора. Попробуйте позже.")
+            return None
+
+    return wrapper
 
 
 @router.message(Command("create_survey"))
+@safe_admin_handler
 async def cmd_create_survey(message: Message, state: FSMContext):
     await message.answer("Введите название анкеты:")
     await state.set_state(CreateSurveyStates.title)
 
 
 @router.message(CreateSurveyStates.title)
+@safe_admin_handler
 async def process_title(message: Message, state: FSMContext):
     await state.update_data(title=message.text)
     await message.answer("Введите описание анкеты:")
@@ -27,6 +50,7 @@ async def process_title(message: Message, state: FSMContext):
 
 
 @router.message(CreateSurveyStates.description)
+@safe_admin_handler
 async def process_description(message: Message, state: FSMContext):
     await state.update_data(description=message.text)
     await state.update_data(questions=[])
@@ -39,6 +63,7 @@ async def process_description(message: Message, state: FSMContext):
 
 @router.message(CreateSurveyStates.question_text, Command("done"))
 @router.message(CreateSurveyStates.question_text, F.text.casefold() == "готово")
+@safe_admin_handler
 async def finish_survey_creation(message: Message, state: FSMContext):
     data = await state.get_data()
     title = data.get("title")
@@ -82,6 +107,7 @@ async def finish_survey_creation(message: Message, state: FSMContext):
 
 
 @router.message(CreateSurveyStates.question_text)
+@safe_admin_handler
 async def process_question_text(message: Message, state: FSMContext):
     if not message.text:
         await message.answer("Введите текст вопроса обычным текстовым сообщением.")
@@ -99,6 +125,7 @@ async def process_question_text(message: Message, state: FSMContext):
     CreateSurveyStates.question_type,
     F.data.in_({"type_text", "type_choice"}),
 )
+@safe_admin_handler
 async def process_question_type(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
 
@@ -131,6 +158,7 @@ async def process_question_type(callback: CallbackQuery, state: FSMContext):
 
 
 @router.message(CreateSurveyStates.choices)
+@safe_admin_handler
 async def process_question_choices(message: Message, state: FSMContext):
     if not message.text:
         await message.answer("Введите варианты ответа текстом через запятую.")
@@ -165,6 +193,7 @@ async def process_question_choices(message: Message, state: FSMContext):
 
 
 @router.message(Command("list_surveys"))
+@safe_admin_handler
 async def cmd_list_surveys(message: Message):
     try:
         surveys = await get_active_surveys(include_demo=True)

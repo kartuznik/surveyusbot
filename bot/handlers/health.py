@@ -6,6 +6,8 @@ from aiogram import Router
 from aiogram.filters import Command
 from aiogram.types import Message
 
+from bot.diagnostics.error_tracker import get_error_tracker
+from bot.diagnostics.stability import get_stability_monitor
 from bot.health import get_monitor
 from bot.locales import (
     ACTIVE_USERS,
@@ -72,6 +74,40 @@ async def cmd_health(message: Message) -> None:
 
     state = monitor.get_status()
     text = render_health_text(state, get_settings().LANGUAGE)
+    await message.answer(text)
+
+
+@router.message(Command("diagnostics"))
+async def cmd_diagnostics(message: Message) -> None:
+    monitor = get_monitor()
+    if monitor is None:
+        await message.answer("Health monitor не инициализирован")
+        return
+    state = monitor.get_status()
+    tracker = get_error_tracker()
+    stability = get_stability_monitor()
+    snapshot = stability.get_snapshot() if stability else None
+    memory_mb = state.get("memory_mb", 0.0)
+    db_ms = snapshot.db_response_ms if snapshot else 0.0
+    active_connections = stability.active_connections if stability else 0
+    errors_hour = tracker.get_errors_count("hour")
+    errors_day = tracker.get_errors_count("day")
+    last_error = tracker.last_error()
+    last_error_line = (
+        f"{last_error.get('error_type')}: {last_error.get('message')}\n{last_error.get('timestamp')}"
+        if last_error
+        else "нет"
+    )
+    text = (
+        "🩺 Диагностика стабильности\n\n"
+        f"• Статус бота: {'онлайн' if state['bot_online'] else 'офлайн'}\n"
+        f"• Ошибок за час/день: {errors_hour}/{errors_day}\n"
+        f"• Память: {memory_mb:.1f} MB\n"
+        f"• Средний ответ БД: {db_ms:.2f} ms\n"
+        f"• Активные соединения: {active_connections}\n"
+        f"• Uptime: {_fmt_uptime(state['uptime_seconds'])}\n"
+        f"• Последняя ошибка:\n{last_error_line}"
+    )
     await message.answer(text)
 
 

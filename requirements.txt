@@ -7,3 +7,6 @@ matplotlib
 fpdf2
 gspread
 aiohttp
+psutil
+pytest
+pytest-asyncio

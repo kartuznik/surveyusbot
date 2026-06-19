@@ -2,6 +2,15 @@
 
 ## RU: Быстрый старт
 
+### Новые возможности v1.1.0
+- Dry-run режим для рассылки `/broadcast_dry`
+- Авто backoff при rate-limit Telegram
+- Экспорт в Google Sheets
+- Webhook интеграция с CRM
+- Экспорт статистики в PDF
+- Страница `/about`
+- Мониторинг стабильности `/diagnostics`
+
 ### 1) Установка
 - Клонируйте проект в `/opt/bots/SurveyBot`
 - Создайте и активируйте виртуальное окружение
@@ -93,9 +102,26 @@
 - CRM Webhook: см. `instructions/WEBHOOK_SETUP.md`
 - Google Sheets: см. `instructions/GOOGLE_SHEETS_SETUP.md`
 
+### 8) Мониторинг и диагностика
+- Команда `/health` — базовое состояние
+- Команда `/diagnostics` — расширенная диагностика (ошибки, память, БД)
+- Логи:
+  - `bot_health.log`
+  - `error_log.json`
+  - `journalctl -u surveybot -f`
+
 ---
 
 ## EN: Quick start
+
+### New in v1.1.0
+- Dry-run broadcast mode (`/broadcast_dry`)
+- Automatic Telegram rate-limit backoff
+- Google Sheets export
+- CRM webhook integration
+- Statistics PDF export
+- Public `/about` page
+- Stability diagnostics with `/diagnostics`
 
 ### 1) Installation
 - Clone/copy project to `/opt/bots/SurveyBot`

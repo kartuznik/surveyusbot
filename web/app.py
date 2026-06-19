@@ -28,8 +28,12 @@ from flask import (
 from bot.integrations.google_sheets import export_to_google_sheets
 from bot.integrations.webhook import send_webhook
 from config import get_settings
-from pdf_export import generate_survey_pdf
-from stats_pdf_export import generate_stats_pdf
+try:
+    from .pdf_export import generate_survey_pdf
+    from .stats_pdf_export import generate_stats_pdf
+except ImportError:
+    from pdf_export import generate_survey_pdf
+    from stats_pdf_export import generate_stats_pdf
 
 load_dotenv(BASE_DIR / ".env")
 
@@ -70,6 +74,12 @@ def login():
         flash("Неверный пароль", "danger")
 
     return render_template("login.html")
+
+
+@app.errorhandler(500)
+def handle_internal_error(error):
+    flash(f"Внутренняя ошибка сервера: {error}", "danger")
+    return render_template("login.html"), 500
 
 
 @app.route("/about")

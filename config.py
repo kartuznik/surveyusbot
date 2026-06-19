@@ -80,6 +80,18 @@ class Settings(BaseSettings):
         default="",
         description="Секрет для HMAC подписи webhook",
     )
+    MAX_ERRORS_BEFORE_HEAL: int = Field(
+        default=10,
+        description="Порог ошибок до авто-лечения",
+    )
+    MEMORY_LIMIT_MB: int = Field(
+        default=500,
+        description="Порог памяти для предупреждения стабильности",
+    )
+    ENABLE_STABILITY_MONITORING: bool = Field(
+        default=True,
+        description="Включает мониторинг стабильности",
+    )
     LANGUAGE: str = Field(
         default="ru",
         description="Язык интерфейса (ru или en)",

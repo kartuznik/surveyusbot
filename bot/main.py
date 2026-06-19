@@ -1,14 +1,18 @@
 import asyncio
 import contextlib
 import logging
+import signal
 import shutil
 import sqlite3
+import traceback
 from pathlib import Path
 
 import aiosqlite
 from aiogram import Bot, Dispatcher
 
 from bot.commands import setup_commands, setup_menu_button
+from bot.diagnostics.error_tracker import get_error_tracker
+from bot.diagnostics.stability import StabilityMonitor, set_stability_monitor
 from bot.handlers import (
     admin,
     broadcast,
@@ -135,20 +139,63 @@ async def main():
     set_monitor(monitor)
     health_task = asyncio.create_task(monitor.run())
     backup_task = asyncio.create_task(periodic_backup_loop(settings.db_path))
+    stability_task: asyncio.Task | None = None
+    if settings.ENABLE_STABILITY_MONITORING:
+        stability_monitor = StabilityMonitor(
+            bot=bot,
+            db_path=settings.db_path,
+            admin_ids=admin_ids,
+            max_errors_before_heal=settings.MAX_ERRORS_BEFORE_HEAL,
+            memory_limit_mb=settings.MEMORY_LIMIT_MB,
+        )
+        set_stability_monitor(stability_monitor)
+        stability_task = asyncio.create_task(stability_monitor.run())
 
     await setup_commands(bot, admin_ids=admin_ids, owner_id=owner_id)
     await setup_menu_button(bot, admin_ids=admin_ids, owner_id=owner_id)
     print("Бот запущен")
+
+    should_stop = asyncio.Event()
+    loop = asyncio.get_running_loop()
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        with contextlib.suppress(Exception):
+            loop.add_signal_handler(sig, should_stop.set)
+
+    tracker = get_error_tracker()
     try:
-        await dp.start_polling(bot)
+        while not should_stop.is_set():
+            try:
+                await dp.start_polling(bot)
+                break
+            except (KeyboardInterrupt, SystemExit):
+                should_stop.set()
+                break
+            except Exception as error:
+                tb = traceback.format_exc()
+                tracker.add_error(type(error).__name__, str(error), tb)
+                logger.exception("Unhandled polling error: %s", error)
+                for admin_id in admin_ids:
+                    with contextlib.suppress(Exception):
+                        await bot.send_message(
+                            admin_id,
+                            f"⚠️ Произошла ошибка в боте: {type(error).__name__}: {error}",
+                        )
+                if tracker.count_since_seconds(600) > 5:
+                    await monitor.heal("too_many_errors_10m")
+                await asyncio.sleep(2)
     finally:
         monitor.stop()
         health_task.cancel()
         backup_task.cancel()
+        if stability_task is not None:
+            stability_task.cancel()
         with contextlib.suppress(asyncio.CancelledError):
             await health_task
         with contextlib.suppress(asyncio.CancelledError):
             await backup_task
+        if stability_task is not None:
+            with contextlib.suppress(asyncio.CancelledError):
+                await stability_task
 
 
 if __name__ == "__main__":

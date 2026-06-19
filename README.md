@@ -2,6 +2,16 @@
 
 SurveyBot - многофункциональный Telegram-бот для опросов с веб-админкой, самодиагностикой и авто-лечением. Проект подходит для использования в командах, образовательных проектах и бизнес-опросах.
 
+## Новые функции v1.1.0
+
+- `/broadcast_dry` для безопасной проверки рассылки без отправки
+- Автоматический rate-limit backoff (429) в рассылке
+- Экспорт ответов в Google Sheets
+- Webhook интеграция с CRM
+- Экспорт статистики в PDF
+- Публичная страница `/about`
+- Мониторинг стабильности и расширенная диагностика `/diagnostics`
+
 ## Ключевые возможности
 
 - Создание анкет и вопросов прямо в Telegram
@@ -67,6 +77,7 @@ systemctl enable --now surveybot-web
 | `/create_survey` | Создать анкету | Owner, Admin |
 | `/list_surveys` | Показать анкеты | Owner, Admin |
 | `/health` | Состояние системы | Owner, Admin |
+| `/diagnostics` | Диагностика стабильности | Owner, Admin |
 | `/stats` | Статистика | Owner, Admin |
 | `/broadcast` | Рассылка | Owner, Admin |
 | `/broadcast_dry` | Тестовая рассылка без отправки | Owner, Admin |
@@ -113,6 +124,17 @@ systemctl enable --now surveybot-web
 - Google Sheets:
   - `GOOGLE_SHEETS_ENABLED`, `GOOGLE_SHEETS_CREDENTIALS`, `GOOGLE_SHEETS_SPREADSHEET_ID`
   - документация: `instructions/GOOGLE_SHEETS_SETUP.md`
+
+## Диагностика и стабильность
+
+- `StabilityMonitor` отслеживает:
+  - ошибки за час/день
+  - использование памяти
+  - среднее время ответа БД
+  - частоту падений polling
+- `ErrorTracker` хранит последние ошибки в памяти и `error_log.json`
+- При всплеске ошибок может запускаться авто-лечение из `health.py`
+- Команда `/diagnostics` показывает расширенный срез стабильности
 
 ## Веб-админка
 
@@ -197,3 +219,8 @@ systemctl status surveybot-check.timer
 ## Лицензия
 
 MIT License.
+
+## Changelog
+
+- `v1.1.0` (2026-06-19): dry-run рассылка, backoff, Google Sheets, webhook CRM, stats PDF, about page, мониторинг стабильности
+- `v1.0.0` (2026-06-18): initial release
