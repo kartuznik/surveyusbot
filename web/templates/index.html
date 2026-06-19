@@ -32,9 +32,9 @@
                         <a class="btn btn-sm btn-primary" href="{{ url_for('survey_detail', survey_id=survey.id) }}">Просмотреть</a>
                     </td>
                     <td>
-                        <a class="btn btn-sm btn-success" href="{{ url_for('export_csv', survey_id=survey.id) }}">Экспорт CSV</a>
-                        <a class="btn btn-sm btn-danger" href="{{ url_for('export_pdf', survey_id=survey.id) }}">Экспорт PDF</a>
-                        <a class="btn btn-sm btn-outline-primary" href="{{ url_for('export_sheets', survey_id=survey.id) }}">Экспорт Google Sheets</a>
+                        <a href="{{ url_for('export_csv', survey_id=survey.id) }}" class="btn btn-success btn-sm me-1 text-nowrap">📊 Экспорт CSV</a>
+                        <a href="{{ url_for('export_pdf', survey_id=survey.id) }}" class="btn btn-danger btn-sm me-1 text-nowrap">📄 Экспорт PDF</a>
+                        <a href="{{ url_for('export_sheets', survey_id=survey.id) }}" class="btn btn-primary btn-sm text-nowrap">📈 Экспорт Google Sheets</a>
                     </td>
                 </tr>
             {% else %}
