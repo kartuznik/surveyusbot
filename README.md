@@ -9,11 +9,13 @@ SurveyBot - многофункциональный Telegram-бот для опр
 - Веб-админка на Flask для просмотра ответов и экспорта CSV
 - Система самодиагностики (`/health`) и авто-лечения
 - Рассылка `/broadcast` с предпросмотром и подтверждением
+- Dry-run рассылка `/broadcast_dry` без отправки реальных сообщений
 - Статистика `/stats` и графики активности
 - Контроль целостности SQLite и резервное копирование БД
 - Автозапуск и восстановление через systemd
 - Мультиязычный вывод состояния (`ru`/`en`)
 - PDF/CSV экспорт из веб-админки и тёмная тема интерфейса
+- Webhook интеграция с CRM и экспорт в Google Sheets
 
 ## Быстрый старт
 
@@ -67,6 +69,7 @@ systemctl enable --now surveybot-web
 | `/health` | Состояние системы | Owner, Admin |
 | `/stats` | Статистика | Owner, Admin |
 | `/broadcast` | Рассылка | Owner, Admin |
+| `/broadcast_dry` | Тестовая рассылка без отправки | Owner, Admin |
 | `/setadmin <user_id>` | Назначить администратора | Owner |
 | `/removeadmin <user_id>` | Отозвать права администратора | Owner |
 | `/admins` | Список owner/admin | Owner |
@@ -101,6 +104,15 @@ systemctl enable --now surveybot-web
 - На старте бот создаёт демо-анкеты
 - Команда `/demo` доступна всем пользователям
 - Демо-анкеты не попадают в обычный список активных анкет для пользователей
+
+## Интеграции
+
+- CRM Webhook:
+  - `WEBHOOK_ENABLED`, `WEBHOOK_URL`, `WEBHOOK_SECRET`
+  - документация: `instructions/WEBHOOK_SETUP.md`
+- Google Sheets:
+  - `GOOGLE_SHEETS_ENABLED`, `GOOGLE_SHEETS_CREDENTIALS`, `GOOGLE_SHEETS_SPREADSHEET_ID`
+  - документация: `instructions/GOOGLE_SHEETS_SETUP.md`
 
 ## Веб-админка
 

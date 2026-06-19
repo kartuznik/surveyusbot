@@ -4,8 +4,14 @@ import csv
 import io
 import os
 import sqlite3
+import sys
+from datetime import UTC, datetime
 from functools import wraps
 from pathlib import Path
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+if str(BASE_DIR) not in sys.path:
+    sys.path.append(str(BASE_DIR))
 
 from dotenv import load_dotenv
 from flask import (
@@ -19,9 +25,12 @@ from flask import (
     session,
     url_for,
 )
+from bot.integrations.google_sheets import export_to_google_sheets
+from bot.integrations.webhook import send_webhook
+from config import get_settings
 from pdf_export import generate_survey_pdf
+from stats_pdf_export import generate_stats_pdf
 
-BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
 
 ADMIN_WEB_PASSWORD = os.getenv("ADMIN_WEB_PASSWORD", "admin")
@@ -30,6 +39,7 @@ SECRET_KEY = os.getenv("FLASK_SECRET", "surveybot-web-secret")
 
 app = Flask(__name__, template_folder="templates")
 app.secret_key = SECRET_KEY
+settings = get_settings()
 
 
 def get_db_connection() -> sqlite3.Connection:
@@ -60,6 +70,13 @@ def login():
         flash("Неверный пароль", "danger")
 
     return render_template("login.html")
+
+
+@app.route("/about")
+def about():
+    version_file = BASE_DIR / "VERSION"
+    version = version_file.read_text(encoding="utf-8").strip() if version_file.exists() else "unknown"
+    return render_template("about.html", version=version)
 
 
 @app.route("/logout", methods=["POST"])
@@ -176,6 +193,39 @@ def export_pdf(survey_id: int):
         as_attachment=True,
         download_name=f"survey_{survey_id}.pdf",
     )
+
+
+@app.route("/export_stats_pdf")
+@login_required
+def export_stats_pdf():
+    pdf_bytes = generate_stats_pdf(DB_PATH)
+    date_suffix = datetime.now(tz=UTC).strftime("%Y%m%d")
+    return send_file(
+        io.BytesIO(pdf_bytes),
+        mimetype="application/pdf",
+        as_attachment=True,
+        download_name=f"surveybot_stats_{date_suffix}.pdf",
+    )
+
+
+@app.route("/export_sheets/<int:survey_id>")
+@login_required
+def export_sheets(survey_id: int):
+    if not settings.GOOGLE_SHEETS_ENABLED:
+        flash("Google Sheets не настроен", "warning")
+        return redirect(url_for("survey_detail", survey_id=survey_id))
+    try:
+        url = export_to_google_sheets(survey_id)
+    except Exception as error:
+        flash(f"Ошибка экспорта в Google Sheets: {error}", "danger")
+        return redirect(url_for("survey_detail", survey_id=survey_id))
+    return redirect(url)
+
+
+@app.route("/webhook/test")
+def webhook_test():
+    send_webhook("new_response", {"source": "webhook_test", "ok": True})
+    return {"status": "scheduled"}
 
 
 if __name__ == "__main__":

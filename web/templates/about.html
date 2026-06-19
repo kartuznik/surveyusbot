@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}О системе | SurveyBot{% endblock %}
+
+{% block content %}
+<div class="card shadow-sm mb-4">
+    <div class="card-body">
+        <h1 class="h2 mb-2">📊 SurveyBot</h1>
+        <div class="text-muted mb-3">Версия {{ version }}</div>
+        <p class="mb-0">Многофункциональный Telegram-бот для опросов с веб-админкой.</p>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-12 col-lg-6">
+        <div class="card shadow-sm h-100">
+            <div class="card-body">
+                <h2 class="h5">Возможности</h2>
+                <ul class="mb-0">
+                    <li>Создание анкет и вопросов</li>
+                    <li>Веб-админка для просмотра ответов</li>
+                    <li>Самодиагностика и авто-лечение</li>
+                    <li>Экспорт CSV/PDF/Google Sheets</li>
+                    <li>Рассылка и статистика с графиками</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-lg-6">
+        <div class="card shadow-sm h-100">
+            <div class="card-body">
+                <h2 class="h5">Технологии</h2>
+                <ul class="mb-0">
+                    <li>Python 3.14</li>
+                    <li>aiogram 3</li>
+                    <li>Flask</li>
+                    <li>SQLite</li>
+                    <li>matplotlib</li>
+                    <li>fpdf2</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    <div class="col-12">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <h2 class="h5">Лицензия</h2>
+                <p class="mb-2">MIT</p>
+                <h2 class="h5">GitHub</h2>
+                <p class="mb-2"><a href="https://github.com/kartuznik/surveyusbot" target="_blank" rel="noopener">https://github.com/kartuznik/surveyusbot</a></p>
+                <h2 class="h5">Поддержка</h2>
+                <p class="mb-0">@your_username</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

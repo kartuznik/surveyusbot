@@ -11,6 +11,7 @@
     <div class="d-flex gap-2">
         <a class="btn btn-outline-success" href="{{ url_for('export_csv', survey_id=survey.id) }}">Экспорт CSV</a>
         <a class="btn btn-outline-danger" href="{{ url_for('export_pdf', survey_id=survey.id) }}">📄 Экспорт PDF</a>
+        <a class="btn btn-outline-primary" href="{{ url_for('export_sheets', survey_id=survey.id) }}">📊 Экспорт в Google Sheets</a>
         <a class="btn btn-outline-secondary" href="{{ url_for('index') }}">Назад</a>
     </div>
 </div>

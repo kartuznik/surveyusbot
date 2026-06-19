@@ -5,3 +5,5 @@ python-dotenv
 pydantic-settings
 matplotlib
 fpdf2
+gspread
+aiohttp

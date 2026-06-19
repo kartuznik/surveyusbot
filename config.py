@@ -52,6 +52,34 @@ class Settings(BaseSettings):
         default="http://localhost:5000",
         description="Базовый URL веб-админки для ссылок из Telegram",
     )
+    BROADCAST_DELAY: float = Field(
+        default=0.5,
+        description="Базовая задержка между сообщениями в рассылке",
+    )
+    GOOGLE_SHEETS_ENABLED: bool = Field(
+        default=False,
+        description="Включает экспорт в Google Sheets",
+    )
+    GOOGLE_SHEETS_CREDENTIALS: str = Field(
+        default="credentials/google_sheets.json",
+        description="Путь к credentials сервисного аккаунта Google",
+    )
+    GOOGLE_SHEETS_SPREADSHEET_ID: str = Field(
+        default="",
+        description="ID Google Spreadsheet для экспорта",
+    )
+    WEBHOOK_ENABLED: bool = Field(
+        default=False,
+        description="Включает CRM webhook интеграцию",
+    )
+    WEBHOOK_URL: str = Field(
+        default="",
+        description="URL для отправки webhook событий",
+    )
+    WEBHOOK_SECRET: str = Field(
+        default="",
+        description="Секрет для HMAC подписи webhook",
+    )
     LANGUAGE: str = Field(
         default="ru",
         description="Язык интерфейса (ru или en)",

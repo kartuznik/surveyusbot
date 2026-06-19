@@ -14,6 +14,7 @@ from aiogram.types import (
 )
 
 from bot.commands import export_commands_file
+from bot.integrations.webhook import send_webhook
 from bot.keyboards import get_survey_list_keyboard
 from bot.roles import get_role_manager_instance
 from bot.states import TakeSurveyStates
@@ -33,6 +34,13 @@ router = Router()
 
 @router.message(CommandStart())
 async def cmd_start(message: Message):
+    send_webhook(
+        "user_started",
+        {
+            "user_id": message.from_user.id if message.from_user else None,
+            "username": message.from_user.username if message.from_user else None,
+        },
+    )
     try:
         surveys = await get_active_surveys()
     except Exception:
@@ -167,6 +175,16 @@ async def process_answer(message: Message, state: FSMContext):
             response_id=int(response_id),
             question_id=int(current_question["id"]),
             answer_text=message.text.strip(),
+        )
+        send_webhook(
+            "new_response",
+            {
+                "response_id": int(response_id),
+                "survey_id": int(data.get("survey_id", 0)),
+                "user_id": message.from_user.id if message.from_user else None,
+                "question_id": int(current_question["id"]),
+                "answer_text": message.text.strip(),
+            },
         )
     except Exception:
         await message.answer("Не удалось сохранить ответ. Попробуйте еще раз.")

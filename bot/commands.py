@@ -24,6 +24,7 @@ ADMIN_COMMANDS: list[tuple[str, str]] = [
     ("health", "Состояние системы (System Health)"),
     ("stats", "Статистика"),
     ("broadcast", "Рассылка"),
+    ("broadcast_dry", "Рассылка dry-run"),
 ]
 
 OWNER_COMMANDS: list[tuple[str, str]] = [

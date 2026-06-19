@@ -5,6 +5,7 @@ from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
+from bot.integrations.webhook import send_webhook
 from bot.keyboards import get_question_type_keyboard
 from bot.states import CreateSurveyStates
 from database import add_question, create_survey, get_active_surveys
@@ -67,6 +68,16 @@ async def finish_survey_creation(message: Message, state: FSMContext):
         return
 
     await state.clear()
+    send_webhook(
+        "new_survey",
+        {
+            "survey_id": survey_id,
+            "title": title,
+            "description": description,
+            "questions_count": len(questions),
+            "created_by": message.from_user.id if message.from_user else None,
+        },
+    )
     await message.answer("Анкета успешно создана и сохранена")
 
 

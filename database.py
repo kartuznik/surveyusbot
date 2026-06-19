@@ -111,6 +111,13 @@ async def init_db() -> None:
                 FOREIGN KEY (question_id) REFERENCES questions(id) ON DELETE CASCADE
             );
 
+            CREATE TABLE IF NOT EXISTS broadcast_audit (
+                user_id INTEGER PRIMARY KEY,
+                last_status TEXT NOT NULL,
+                last_error TEXT,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
             CREATE INDEX IF NOT EXISTS idx_users_telegram_id
                 ON users (telegram_id);
             CREATE INDEX IF NOT EXISTS idx_questions_survey_id_order
@@ -466,6 +473,55 @@ async def get_all_users() -> list[int]:
         await db.close()
 
 
+async def get_all_users_with_meta() -> list[dict[str, Any]]:
+    db = await get_db()
+    try:
+        rows = await (
+            await db.execute(
+                """
+                SELECT
+                    u.telegram_id AS user_id,
+                    u.username AS username,
+                    COALESCE(
+                        (
+                            SELECT MAX(COALESCE(r.completed_at, r.started_at))
+                            FROM responses r
+                            WHERE r.user_id = u.id
+                        ),
+                        u.created_at
+                    ) AS last_activity,
+                    COALESCE(ba.last_status, 'unknown') AS last_broadcast_status
+                FROM users u
+                LEFT JOIN broadcast_audit ba ON ba.user_id = u.telegram_id
+                GROUP BY u.id, u.telegram_id, u.username, u.created_at, ba.last_status
+                ORDER BY last_activity DESC
+                """
+            )
+        ).fetchall()
+        return [dict(row) for row in rows]
+    finally:
+        await db.close()
+
+
+async def set_broadcast_audit(user_id: int, status: str, error: str | None = None) -> None:
+    db = await get_db()
+    try:
+        await db.execute(
+            """
+            INSERT INTO broadcast_audit (user_id, last_status, last_error, updated_at)
+            VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(user_id) DO UPDATE SET
+                last_status=excluded.last_status,
+                last_error=excluded.last_error,
+                updated_at=CURRENT_TIMESTAMP
+            """,
+            (user_id, status, error),
+        )
+        await db.commit()
+    finally:
+        await db.close()
+
+
 async def get_users_count(period: str = "all") -> int:
     db = await get_db()
     try:
@@ -519,6 +575,30 @@ async def get_top_surveys(limit: int = 5) -> list[dict[str, Any]]:
                 WHERE COALESCE(s.is_demo, 0) = 0
                 GROUP BY s.id, s.title
                 ORDER BY responses_count DESC, s.id ASC
+                LIMIT ?
+                """,
+                (limit,),
+            )
+        ).fetchall()
+        return [dict(row) for row in rows]
+    finally:
+        await db.close()
+
+
+async def get_top_users(limit: int = 10) -> list[dict[str, Any]]:
+    db = await get_db()
+    try:
+        rows = await (
+            await db.execute(
+                """
+                SELECT
+                    COALESCE(CAST(u.telegram_id AS TEXT), CAST(r.user_id AS TEXT)) AS user_id,
+                    COUNT(a.id) AS answers_count
+                FROM responses r
+                LEFT JOIN users u ON u.id = r.user_id
+                LEFT JOIN answers a ON a.response_id = r.id
+                GROUP BY user_id
+                ORDER BY answers_count DESC
                 LIMIT ?
                 """,
                 (limit,),

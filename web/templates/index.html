@@ -5,6 +5,7 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h1 class="h3 mb-0">Список анкет</h1>
+    <a class="btn btn-sm btn-outline-primary" href="{{ url_for('export_stats_pdf') }}">📊 Экспорт статистики PDF</a>
 </div>
 
 <div class="card shadow-sm">
