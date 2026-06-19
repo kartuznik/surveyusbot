@@ -34,7 +34,7 @@
                     <td>
                         <a href="{{ url_for('export_csv', survey_id=survey.id) }}" class="btn btn-success btn-sm me-1 text-nowrap">📊 Экспорт CSV</a>
                         <a href="{{ url_for('export_pdf', survey_id=survey.id) }}" class="btn btn-danger btn-sm me-1 text-nowrap">📄 Экспорт PDF</a>
-                        <a href="{{ url_for('export_sheets', survey_id=survey.id) }}" class="btn btn-primary btn-sm text-nowrap">📈 Экспорт Google Sheets</a>
+                        <a href="{{ url_for('export_sheets', survey_id=survey.id) }}" class="btn btn-sheets btn-sm text-nowrap">📈 Экспорт Google Sheets</a>
                     </td>
                 </tr>
             {% else %}
