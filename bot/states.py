@@ -12,3 +12,8 @@ class CreateSurveyStates(StatesGroup):
 class TakeSurveyStates(StatesGroup):
     survey_selection = State()
     answering = State()
+
+
+class BroadcastStates(StatesGroup):
+    waiting_content = State()
+    waiting_confirmation = State()

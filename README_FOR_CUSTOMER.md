@@ -15,11 +15,14 @@
 - `BOT_TOKEN` - токен Telegram-бота
 - `ADMIN_IDS` - список ID админов через запятую (пример: `12345,67890`)
 - `LANGUAGE` - язык интерфейса (`ru` или `en`)
+- `OWNER_ID` - Telegram ID владельца (опционально, иначе первый из `ADMIN_IDS`)
 
 Дополнительно:
 - `DB_PATH` - путь к БД (по умолчанию `data/surveybot.db`)
 - `ADMIN_WEB_PASSWORD` - пароль веб-админки
 - `FLASK_SECRET` - секрет Flask
+- `DEMO_MODE` - включение демо-анкет (`true/false`)
+- `NOTIFY_ON_RESPONSE` - уведомлять админов о новых ответах
 
 ### 3) Активация админ-панели
 Вариант A: через BotFather
@@ -39,11 +42,23 @@
 ### 4) Основные команды
 - `/start` - запустить бота
 - `/help` - справка
-- `/create_survey` - создать анкету
-- `/list_surveys` - список анкет
-- `/health` - состояние системы (админ)
+- `/create_survey` - создать анкету (owner/admin)
+- `/list_surveys` - список анкет (owner/admin)
+- `/health` - состояние системы (owner/admin)
+- `/setadmin <user_id>` - назначить админа (owner)
+- `/removeadmin <user_id>` - убрать админа (owner)
+- `/admins` - список админов (owner)
+- `/transferowner <user_id>` - передать права владельца (owner)
 - `/setadmin` - инструкция по настройке команд
 - `/export_commands` - выгрузка команд для BotFather
+
+### 4.1) Система ролей
+- `owner` - владелец бота, управляет правами
+- `admin` - администратор с расширенными командами
+- `user` - обычный пользователь
+
+Владелец может в любой момент отозвать права у администратора (например, если сотрудник уволен):
+- `/removeadmin 123456789`
 
 ### 5) Как добавить вопросы в анкету
 1. Выполните `/create_survey`
@@ -52,6 +67,12 @@
    - текстовые
    - с вариантами ответа (через запятую)
 4. Для завершения отправьте `Готово` или `/done`
+
+### 6) Демо-режим
+- Включите `DEMO_MODE=true` в `.env`
+- После перезапуска создадутся демо-анкеты
+- Пользователь может пройти их через `/demo`
+- После завершения показывается промо-сообщение для покупки полной версии
 
 ---
 
@@ -70,11 +91,14 @@ Required variables:
 - `BOT_TOKEN` - Telegram bot token
 - `ADMIN_IDS` - comma-separated admin IDs (example: `12345,67890`)
 - `LANGUAGE` - interface language (`ru` or `en`)
+- `OWNER_ID` - owner Telegram ID (optional, else first from `ADMIN_IDS`)
 
 Optional:
 - `DB_PATH` - database path (default `data/surveybot.db`)
 - `ADMIN_WEB_PASSWORD` - web admin password
 - `FLASK_SECRET` - Flask secret key
+- `DEMO_MODE` - enable demo surveys (`true/false`)
+- `NOTIFY_ON_RESPONSE` - notify admins about new responses
 
 ### 3) Enable admin panel
 Option A: via BotFather
@@ -94,11 +118,23 @@ If it does not appear, send `/start` to the bot.
 ### 4) Main commands
 - `/start` - start bot
 - `/help` - help
-- `/create_survey` - create survey
-- `/list_surveys` - list surveys
-- `/health` - system health (admin)
+- `/create_survey` - create survey (owner/admin)
+- `/list_surveys` - list surveys (owner/admin)
+- `/health` - system health (owner/admin)
+- `/setadmin <user_id>` - grant admin role (owner)
+- `/removeadmin <user_id>` - revoke admin role (owner)
+- `/admins` - list admins (owner)
+- `/transferowner <user_id>` - transfer owner role (owner)
 - `/setadmin` - setup instructions
 - `/export_commands` - export commands for BotFather
+
+### 4.1) Role system
+- `owner` - full control over role management
+- `admin` - operational admin commands
+- `user` - regular user
+
+Owner can revoke admin rights at any time (for example, when staff changes):
+- `/removeadmin 123456789`
 
 ### 5) How to add survey questions
 1. Run `/create_survey`
@@ -107,3 +143,9 @@ If it does not appear, send `/start` to the bot.
    - free-text
    - choice questions (comma-separated options)
 4. Finish with `Готово` or `/done`
+
+### 6) Demo mode
+- Set `DEMO_MODE=true` in `.env`
+- Restart bot to auto-create demo surveys
+- Users can open demo flow with `/demo`
+- After completion, bot shows a contact message for full version purchase

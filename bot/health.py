@@ -37,6 +37,7 @@ class BotHealthMonitor:
         self.free_disk_bytes = 0
         self.active_users = 0
         self.last_critical_error: str | None = None
+        self.last_critical_at: datetime | None = None
         self.last_heal_at: datetime | None = None
 
         self._stop_event = asyncio.Event()
@@ -87,7 +88,7 @@ class BotHealthMonitor:
             return True
         except Exception as error:
             self.bot_online = False
-            self.last_critical_error = f"bot_unreachable: {error}"
+            self._mark_critical(f"bot_unreachable: {error}")
             self._log(logging.ERROR, "BOT", f"Бот не отвечает: {error}")
             return False
 
@@ -127,6 +128,7 @@ class BotHealthMonitor:
                     return True
 
                 self.last_critical_error = f"database_integrity: {error_text}"
+                self.last_critical_at = datetime.now(tz=UTC)
                 self._log(logging.ERROR, "DB", f"Ошибка целостности БД: {error_text}")
                 return False
             except sqlite3.OperationalError as error:
@@ -142,13 +144,13 @@ class BotHealthMonitor:
                         continue
                 self.last_db_ok = False
                 self.last_db_error = str(error)
-                self.last_critical_error = f"database_error: {error}"
+                self._mark_critical(f"database_error: {error}")
                 self._log(logging.ERROR, "DB", f"Ошибка подключения к SQLite: {error}")
                 return False
             except Exception as error:
                 self.last_db_ok = False
                 self.last_db_error = str(error)
-                self.last_critical_error = f"database_error: {error}"
+                self._mark_critical(f"database_error: {error}")
                 self._log(logging.ERROR, "DB", f"Неожиданная ошибка проверки БД: {error}")
                 return False
         return False
@@ -159,7 +161,7 @@ class BotHealthMonitor:
         self.free_disk_bytes = usage.free
         min_free_bytes = 100 * 1024 * 1024
         if usage.free < min_free_bytes:
-            self.last_critical_error = "low_disk_space"
+            self._mark_critical("low_disk_space")
             self._log(
                 logging.WARNING,
                 "RESOURCES",
@@ -173,6 +175,10 @@ class BotHealthMonitor:
             f"Ресурсы в норме, свободно {usage.free // (1024 * 1024)}MB",
         )
         return True
+
+    def _mark_critical(self, reason: str) -> None:
+        self.last_critical_error = reason
+        self.last_critical_at = datetime.now(tz=UTC)
 
     async def heal(self, reason: str) -> bool:
         if self._is_healing:
@@ -294,6 +300,7 @@ class BotHealthMonitor:
             "active_users": self.active_users,
             "uptime_seconds": int((datetime.now(tz=UTC) - self.started_at).total_seconds()),
             "last_critical_error": self.last_critical_error,
+            "last_critical_at": self.last_critical_at,
             "last_heal_at": self.last_heal_at,
         }
 

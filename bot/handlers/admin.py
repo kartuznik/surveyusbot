@@ -156,7 +156,7 @@ async def process_question_choices(message: Message, state: FSMContext):
 @router.message(Command("list_surveys"))
 async def cmd_list_surveys(message: Message):
     try:
-        surveys = await get_active_surveys()
+        surveys = await get_active_surveys(include_demo=True)
     except Exception:
         await message.answer("Не удалось получить список анкет. Попробуйте позже.")
         return

@@ -8,17 +8,14 @@ from typing import Any
 from aiogram import BaseMiddleware
 from aiogram.types import CallbackQuery, Message, TelegramObject
 
-from config import get_settings
+from bot.roles import RoleManager
 
 
-class AdminMiddleware(BaseMiddleware):
-    """Проверяет, что пользователь входит в список администраторов.
+class OwnerOnlyMiddleware(BaseMiddleware):
+    """Разрешает доступ только владельцу."""
 
-    Логика:
-    - Если обновление не содержит пользователя, пропускаем обработку.
-    - Если пользователь админ, передаем управление дальше.
-    - Если пользователь не админ, отправляем уведомление и блокируем хендлер.
-    """
+    def __init__(self, role_manager: RoleManager) -> None:
+        self.role_manager = role_manager
 
     async def __call__(
         self,
@@ -26,19 +23,42 @@ class AdminMiddleware(BaseMiddleware):
         event: TelegramObject,
         data: dict[str, Any],
     ) -> Any:
-        settings = get_settings()
-        admin_ids = set(settings.ADMIN_IDS)
-
         user_id = getattr(getattr(event, "from_user", None), "id", None)
-
-        # Если event без from_user (редкий технический случай), не блокируем.
         if user_id is None:
             return await handler(event, data)
 
-        if user_id in admin_ids:
+        if await self.role_manager.is_owner(int(user_id)):
             return await handler(event, data)
 
-        # Мягко сообщаем о запрете доступа, не вызывая целевой хендлер.
+        if isinstance(event, Message):
+            await event.answer("Команда доступна только владельцу бота.")
+        elif isinstance(event, CallbackQuery):
+            await event.answer(
+                "Команда доступна только владельцу.",
+                show_alert=True,
+            )
+        return None
+
+
+class AdminOrOwnerMiddleware(BaseMiddleware):
+    """Разрешает доступ владельцу и администраторам."""
+
+    def __init__(self, role_manager: RoleManager) -> None:
+        self.role_manager = role_manager
+
+    async def __call__(
+        self,
+        handler: Callable[[TelegramObject, dict[str, Any]], Awaitable[Any]],
+        event: TelegramObject,
+        data: dict[str, Any],
+    ) -> Any:
+        user_id = getattr(getattr(event, "from_user", None), "id", None)
+        if user_id is None:
+            return await handler(event, data)
+
+        if await self.role_manager.is_admin(int(user_id)):
+            return await handler(event, data)
+
         if isinstance(event, Message):
             await event.answer("У вас нет прав администратора для этой команды.")
         elif isinstance(event, CallbackQuery):

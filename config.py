@@ -28,6 +28,10 @@ class Settings(BaseSettings):
         default_factory=list,
         description="Список Telegram ID администраторов",
     )
+    OWNER_ID: int | None = Field(
+        default=None,
+        description="Telegram ID владельца (если пусто, берется первый из ADMIN_IDS)",
+    )
     DB_PATH: str = Field(
         default="data/surveybot.db",
         description="Путь к SQLite-файлу (общий для бота и Flask)",
@@ -35,6 +39,18 @@ class Settings(BaseSettings):
     ADMIN_WEB_PASSWORD: str = Field(
         default="admin",
         description="Простой пароль для входа в Flask-админку",
+    )
+    DEMO_MODE: bool = Field(
+        default=False,
+        description="Включает демо-анкеты для покупателей",
+    )
+    NOTIFY_ON_RESPONSE: bool = Field(
+        default=True,
+        description="Отправлять уведомления админам о новых ответах",
+    )
+    WEB_ADMIN_BASE_URL: str = Field(
+        default="http://localhost:5000",
+        description="Базовый URL веб-админки для ссылок из Telegram",
     )
     LANGUAGE: str = Field(
         default="ru",
@@ -67,6 +83,20 @@ class Settings(BaseSettings):
 
         raise ValueError("ADMIN_IDS должен быть строкой или списком ID")
 
+    @field_validator("OWNER_ID", mode="before")
+    @classmethod
+    def parse_owner_id(cls, value: Any) -> int | None:
+        if value is None or value == "":
+            return None
+        if isinstance(value, (int, float)):
+            return int(value)
+        if isinstance(value, str):
+            value = value.strip()
+            if not value:
+                return None
+            return int(value)
+        raise ValueError("OWNER_ID должен быть числом или пустым значением")
+
     @field_validator("LANGUAGE", mode="before")
     @classmethod
     def validate_language(cls, value: Any) -> str:
@@ -82,6 +112,14 @@ class Settings(BaseSettings):
         """Удобный алиас в snake_case для Python-кода."""
 
         return self.DB_PATH
+
+    @property
+    def owner_id(self) -> int | None:
+        if self.OWNER_ID is not None:
+            return self.OWNER_ID
+        if self.ADMIN_IDS:
+            return self.ADMIN_IDS[0]
+        return None
 
 
 @lru_cache(maxsize=1)

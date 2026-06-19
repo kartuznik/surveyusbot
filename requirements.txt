@@ -3,3 +3,5 @@ aiosqlite
 flask
 python-dotenv
 pydantic-settings
+matplotlib
+fpdf2

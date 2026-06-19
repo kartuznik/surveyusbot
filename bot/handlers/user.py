@@ -1,15 +1,32 @@
+from datetime import UTC, datetime
 from typing import Any
 
 from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, FSInputFile, Message
+from aiogram.types import (
+    CallbackQuery,
+    FSInputFile,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    Message,
+)
 
 from bot.commands import export_commands_file
 from bot.keyboards import get_survey_list_keyboard
+from bot.roles import get_role_manager_instance
 from bot.states import TakeSurveyStates
-from database import complete_response, create_response, get_active_surveys, get_questions, save_answer
+from config import get_settings
+from database import (
+    complete_response,
+    create_response,
+    get_active_surveys,
+    get_questions,
+    get_response_notification_payload,
+    get_survey_title,
+    save_answer,
+)
 
 router = Router()
 
@@ -38,21 +55,11 @@ async def cmd_help(message: Message):
         "Доступные команды:\n"
         "/start - Запустить бота\n"
         "/help - Помощь\n"
-        "/create_survey - Создать анкету (для админов)\n"
-        "/list_surveys - Список анкет (для админов)\n"
-        "/setadmin - Инструкция по активации админ-панели\n"
+        "/demo - Демо-анкеты для ознакомления\n"
+        "/create_survey - Создать анкету (owner/admin)\n"
+        "/list_surveys - Список анкет (owner/admin)\n"
+        "/health - Состояние системы (owner/admin)\n"
         "/export_commands - Выгрузить commands.txt для BotFather"
-    )
-
-
-@router.message(Command("setadmin"))
-async def cmd_setadmin(message: Message):
-    await message.answer(
-        "Для активации админ-панели выполните:\n"
-        "1. Откройте @BotFather\n"
-        "2. Выберите вашего бота\n"
-        "3. Commands -> Edit Commands\n"
-        "4. Скопируйте команды из файла commands.txt"
     )
 
 
@@ -73,8 +80,21 @@ async def _send_current_question(message: Message, state: FSMContext) -> None:
     current_index: int = data.get("current_index", 0)
 
     if current_index >= len(questions):
-        await message.answer("Спасибо, ваши ответы сохранены")
-        await complete_response(response_id=int(data["response_id"]))
+        if data.get("demo_mode"):
+            await message.answer(
+                "✅ Демо завершено! Для покупки полной версии свяжитесь с нами: @your_username"
+            )
+        else:
+            await message.answer("Спасибо, ваши ответы сохранены")
+        response_id = int(data["response_id"])
+        await complete_response(response_id=response_id)
+        if not data.get("demo_mode"):
+            await _notify_admins_about_response(
+                message=message,
+                survey_id=int(data.get("survey_id", 0)),
+                response_id=response_id,
+                questions_count=len(questions),
+            )
         await state.clear()
         return
 
@@ -154,3 +174,56 @@ async def process_answer(message: Message, state: FSMContext):
 
     await state.update_data(current_index=current_index + 1)
     await _send_current_question(message, state)
+
+
+async def _notify_admins_about_response(
+    message: Message,
+    survey_id: int,
+    response_id: int,
+    questions_count: int,
+) -> None:
+    settings = get_settings()
+    if not settings.NOTIFY_ON_RESPONSE:
+        return
+
+    role_manager = get_role_manager_instance()
+    if role_manager is None:
+        return
+
+    payload = await get_response_notification_payload(response_id)
+    survey_title = payload.get("survey_title") or await get_survey_title(survey_id)
+    telegram_user_id = payload.get("telegram_id") or (message.from_user.id if message.from_user else "unknown")
+    completed_at = payload.get("completed_at") or datetime.now(tz=UTC).strftime("%Y-%m-%d %H:%M:%S")
+    answers_count = int(payload.get("answers_count") or 0)
+    total_questions = int(payload.get("questions_count") or questions_count)
+
+    started_raw = payload.get("started_at")
+    completed_raw = payload.get("completed_at")
+    duration_minutes = 0
+    try:
+        if started_raw and completed_raw:
+            started_dt = datetime.fromisoformat(str(started_raw).replace("Z", ""))
+            completed_dt = datetime.fromisoformat(str(completed_raw).replace("Z", ""))
+            duration_minutes = max(int((completed_dt - started_dt).total_seconds() // 60), 0)
+    except Exception:
+        duration_minutes = 0
+
+    text = (
+        "Новый ответ на анкету!\n\n"
+        f"📋 Анкета: {survey_title}\n"
+        f"👤 Пользователь: {telegram_user_id}\n"
+        f"🕐 Время: {completed_at}\n"
+        f"⏱️ Длительность: {duration_minutes} мин\n"
+        f"✅ Ответов: {answers_count} из {total_questions}"
+    )
+    link = f"{settings.WEB_ADMIN_BASE_URL.rstrip('/')}/survey/{survey_id}"
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[[InlineKeyboardButton(text="🔗 Просмотреть в админке", url=link)]]
+    )
+
+    admin_ids = await role_manager.get_all_admins()
+    for admin_id in admin_ids:
+        try:
+            await message.bot.send_message(chat_id=admin_id, text=text, reply_markup=keyboard)
+        except Exception:
+            continue

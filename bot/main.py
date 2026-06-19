@@ -9,11 +9,20 @@ import aiosqlite
 from aiogram import Bot, Dispatcher
 
 from bot.commands import setup_commands, setup_menu_button
-from bot.handlers import admin, health as health_handler, user
+from bot.handlers import (
+    admin,
+    broadcast,
+    demo,
+    health as health_handler,
+    roles as roles_handler,
+    stats,
+    user,
+)
 from bot.health import BotHealthMonitor, set_monitor
+from bot.roles import RoleManager, set_role_manager_instance
 from config import get_settings
-from database import init_db
-from middlewares import AdminMiddleware
+from database import create_demo_surveys, init_db
+from middlewares import AdminOrOwnerMiddleware, OwnerOnlyMiddleware
 
 logger = logging.getLogger("surveybot.startup")
 
@@ -83,32 +92,52 @@ async def main():
     settings = get_settings()
     await ensure_database_integrity_or_restore(settings.db_path)
     await init_db()
+    if settings.DEMO_MODE:
+        await create_demo_surveys()
     await backup_database(settings.db_path)
+
+    role_manager = RoleManager(settings.db_path)
+    await role_manager.init_schema()
+    await role_manager.ensure_initial_roles(settings.owner_id, settings.ADMIN_IDS)
+    set_role_manager_instance(role_manager)
+    roles_handler.set_role_manager(role_manager)
+    admin_ids = await role_manager.get_all_admins()
+    owner_id = await role_manager.get_owner_id()
 
     bot = Bot(token=settings.BOT_TOKEN)
     dp = Dispatcher()
 
-    admin_middleware = AdminMiddleware()
+    admin_middleware = AdminOrOwnerMiddleware(role_manager)
+    owner_middleware = OwnerOnlyMiddleware(role_manager)
     admin.router.message.middleware(admin_middleware)
     admin.router.callback_query.middleware(admin_middleware)
     health_handler.router.message.middleware(admin_middleware)
+    stats.router.message.middleware(admin_middleware)
+    stats.router.callback_query.middleware(admin_middleware)
+    broadcast.router.message.middleware(admin_middleware)
+    broadcast.router.callback_query.middleware(admin_middleware)
+    roles_handler.router.message.middleware(owner_middleware)
 
     dp.include_router(admin.router)
     dp.include_router(health_handler.router)
+    dp.include_router(stats.router)
+    dp.include_router(broadcast.router)
+    dp.include_router(roles_handler.router)
+    dp.include_router(demo.router)
     dp.include_router(user.router)
 
     monitor = BotHealthMonitor(
         bot=bot,
         db_path=settings.db_path,
         data_dir="data",
-        admin_ids=settings.ADMIN_IDS,
+        admin_ids=admin_ids,
     )
     set_monitor(monitor)
     health_task = asyncio.create_task(monitor.run())
     backup_task = asyncio.create_task(periodic_backup_loop(settings.db_path))
 
-    await setup_commands(bot)
-    await setup_menu_button(bot, settings.ADMIN_IDS)
+    await setup_commands(bot, admin_ids=admin_ids, owner_id=owner_id)
+    await setup_menu_button(bot, admin_ids=admin_ids, owner_id=owner_id)
     print("Бот запущен")
     try:
         await dp.start_polling(bot)

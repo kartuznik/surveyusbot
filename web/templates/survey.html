@@ -10,13 +10,14 @@
     </div>
     <div class="d-flex gap-2">
         <a class="btn btn-outline-success" href="{{ url_for('export_csv', survey_id=survey.id) }}">Экспорт CSV</a>
+        <a class="btn btn-outline-danger" href="{{ url_for('export_pdf', survey_id=survey.id) }}">📄 Экспорт PDF</a>
         <a class="btn btn-outline-secondary" href="{{ url_for('index') }}">Назад</a>
     </div>
 </div>
 
 <div class="card shadow-sm">
     <div class="table-responsive">
-        <table class="table table-striped mb-0">
+        <table class="table table-striped table-hover mb-0">
             <thead>
                 <tr>
                     <th>user_id</th>

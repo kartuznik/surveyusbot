@@ -15,9 +15,11 @@ from flask import (
     redirect,
     render_template,
     request,
+    send_file,
     session,
     url_for,
 )
+from pdf_export import generate_survey_pdf
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
@@ -156,6 +158,23 @@ def export_csv(survey_id: int):
         csv_data,
         mimetype="text/csv; charset=utf-8",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@app.route("/export_pdf/<int:survey_id>")
+@login_required
+def export_pdf(survey_id: int):
+    try:
+        pdf_bytes = generate_survey_pdf(survey_id, DB_PATH)
+    except ValueError:
+        flash("Анкета не найдена", "warning")
+        return redirect(url_for("index"))
+
+    return send_file(
+        io.BytesIO(pdf_bytes),
+        mimetype="application/pdf",
+        as_attachment=True,
+        download_name=f"survey_{survey_id}.pdf",
     )
 
 

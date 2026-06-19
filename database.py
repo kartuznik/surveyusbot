@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import json
+from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
@@ -122,6 +123,10 @@ async def init_db() -> None:
                 ON answers (response_id);
             """
         )
+        columns = await (await db.execute("PRAGMA table_info(surveys)")).fetchall()
+        column_names = {str(column[1]) for column in columns}
+        if "is_demo" not in column_names:
+            await db.execute("ALTER TABLE surveys ADD COLUMN is_demo INTEGER NOT NULL DEFAULT 0")
         await db.commit()
     finally:
         await db.close()
@@ -188,19 +193,29 @@ async def add_question(
         await db.close()
 
 
-async def get_active_surveys() -> list[dict[str, Any]]:
+async def get_active_surveys(include_demo: bool = False) -> list[dict[str, Any]]:
     """Возвращает список активных анкет."""
 
     db = await get_db()
     try:
-        cursor = await db.execute(
-            """
-            SELECT id, title, description, is_active, created_at
-            FROM surveys
-            WHERE is_active = 1
-            ORDER BY created_at DESC
-            """
-        )
+        if include_demo:
+            cursor = await db.execute(
+                """
+                SELECT id, title, description, is_active, created_at, COALESCE(is_demo, 0) AS is_demo
+                FROM surveys
+                WHERE is_active = 1
+                ORDER BY created_at DESC
+                """
+            )
+        else:
+            cursor = await db.execute(
+                """
+                SELECT id, title, description, is_active, created_at, COALESCE(is_demo, 0) AS is_demo
+                FROM surveys
+                WHERE is_active = 1 AND COALESCE(is_demo, 0) = 0
+                ORDER BY created_at DESC
+                """
+            )
         rows = await cursor.fetchall()
         return [dict(row) for row in rows]
     except Exception as error:
@@ -330,5 +345,299 @@ async def complete_response(response_id: int) -> None:
         await db.commit()
     except Exception as error:
         raise RuntimeError("Не удалось завершить прохождение анкеты") from error
+    finally:
+        await db.close()
+
+
+async def get_demo_surveys() -> list[dict[str, Any]]:
+    db = await get_db()
+    try:
+        cursor = await db.execute(
+            """
+            SELECT id, title, description, is_active, created_at, COALESCE(is_demo, 0) AS is_demo
+            FROM surveys
+            WHERE is_active = 1 AND COALESCE(is_demo, 0) = 1
+            ORDER BY created_at DESC
+            """
+        )
+        rows = await cursor.fetchall()
+        return [dict(row) for row in rows]
+    finally:
+        await db.close()
+
+
+async def create_demo_surveys() -> None:
+    seeds = [
+        (
+            "Опрос удовлетворённости клиентов",
+            "Демо-анкета для оценки клиентского опыта",
+            [
+                ("Как вас зовут?", "text", None),
+                ("Ваш возраст", "choice", ["18-24", "25-34", "35-44", "45+"]),
+                ("Оцените сервис от 1 до 5", "choice", ["1", "2", "3", "4", "5"]),
+                ("Комментарий", "text", None),
+                ("Порекомендуете нас друзьям?", "choice", ["Да", "Нет"]),
+            ],
+        ),
+        (
+            "Оценка качества обслуживания",
+            "Демо-анкета по работе менеджеров",
+            [
+                ("Вежливость сотрудника", "choice", ["Плохо", "Нормально", "Отлично"]),
+                ("Скорость решения вопроса", "choice", ["Медленно", "Средне", "Быстро"]),
+                ("Комментарий", "text", None),
+            ],
+        ),
+        (
+            "Сбор обратной связи",
+            "Демо-анкета для продуктовой обратной связи",
+            [
+                ("Что понравилось больше всего?", "text", None),
+                ("Что нужно улучшить?", "text", None),
+                ("Насколько удобен интерфейс?", "choice", ["1", "2", "3", "4", "5"]),
+                ("Хотите получить ответ от команды?", "choice", ["Да", "Нет"]),
+            ],
+        ),
+    ]
+
+    db = await get_db()
+    try:
+        for title, description, questions in seeds:
+            existing = await (
+                await db.execute(
+                    "SELECT id FROM surveys WHERE title = ? AND COALESCE(is_demo, 0) = 1 LIMIT 1",
+                    (title,),
+                )
+            ).fetchone()
+            if existing:
+                continue
+            await db.execute(
+                """
+                INSERT INTO surveys (title, description, is_active, is_demo)
+                VALUES (?, ?, 1, 1)
+                """,
+                (title, description),
+            )
+            survey_id = int((await (await db.execute("SELECT last_insert_rowid()")).fetchone())[0])
+            for idx, (q_text, q_type, choices) in enumerate(questions):
+                await db.execute(
+                    """
+                    INSERT INTO questions (survey_id, question_text, question_type, choices_json, order_index)
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                    (
+                        survey_id,
+                        q_text,
+                        q_type,
+                        json.dumps(choices, ensure_ascii=False) if choices else None,
+                        idx,
+                    ),
+                )
+        await db.commit()
+    finally:
+        await db.close()
+
+
+async def get_all_users() -> list[int]:
+    db = await get_db()
+    try:
+        users_rows = await (await db.execute("SELECT telegram_id FROM users")).fetchall()
+        if users_rows:
+            return sorted({int(row[0]) for row in users_rows})
+    except Exception:
+        pass
+    finally:
+        await db.close()
+
+    db = await get_db()
+    try:
+        rows = await (
+            await db.execute(
+                """
+                SELECT DISTINCT u.telegram_id
+                FROM responses r
+                LEFT JOIN users u ON u.id = r.user_id
+                WHERE u.telegram_id IS NOT NULL
+                """
+            )
+        ).fetchall()
+        return sorted({int(row[0]) for row in rows})
+    finally:
+        await db.close()
+
+
+async def get_users_count(period: str = "all") -> int:
+    db = await get_db()
+    try:
+        if period == "all":
+            row = await (await db.execute("SELECT COUNT(DISTINCT telegram_id) FROM users")).fetchone()
+            return int(row[0] if row else 0)
+        period_map = {"today": "-1 day", "week": "-7 day", "month": "-30 day"}
+        delta = period_map.get(period, "-36500 day")
+        row = await (
+            await db.execute(
+                """
+                SELECT COUNT(DISTINCT telegram_id)
+                FROM users
+                WHERE datetime(created_at) >= datetime('now', ?)
+                """,
+                (delta,),
+            )
+        ).fetchone()
+        return int(row[0] if row else 0)
+    finally:
+        await db.close()
+
+
+async def get_surveys_count() -> int:
+    db = await get_db()
+    try:
+        row = await (await db.execute("SELECT COUNT(*) FROM surveys WHERE COALESCE(is_demo, 0) = 0")).fetchone()
+        return int(row[0] if row else 0)
+    finally:
+        await db.close()
+
+
+async def get_responses_count() -> int:
+    db = await get_db()
+    try:
+        row = await (await db.execute("SELECT COUNT(*) FROM responses WHERE status = 'completed'")).fetchone()
+        return int(row[0] if row else 0)
+    finally:
+        await db.close()
+
+
+async def get_top_surveys(limit: int = 5) -> list[dict[str, Any]]:
+    db = await get_db()
+    try:
+        rows = await (
+            await db.execute(
+                """
+                SELECT s.id, s.title, COUNT(r.id) AS responses_count
+                FROM surveys s
+                LEFT JOIN responses r ON r.survey_id = s.id AND r.status = 'completed'
+                WHERE COALESCE(s.is_demo, 0) = 0
+                GROUP BY s.id, s.title
+                ORDER BY responses_count DESC, s.id ASC
+                LIMIT ?
+                """,
+                (limit,),
+            )
+        ).fetchall()
+        return [dict(row) for row in rows]
+    finally:
+        await db.close()
+
+
+async def get_daily_activity(days: int = 30) -> list[dict[str, Any]]:
+    db = await get_db()
+    try:
+        user_rows = await (
+            await db.execute(
+                """
+                SELECT date(created_at) AS day, COUNT(DISTINCT telegram_id) AS users_count
+                FROM users
+                WHERE datetime(created_at) >= datetime('now', ?)
+                GROUP BY day
+                ORDER BY day ASC
+                """,
+                (f"-{days} day",),
+            )
+        ).fetchall()
+        response_rows = await (
+            await db.execute(
+                """
+                SELECT date(completed_at) AS day, COUNT(*) AS responses_count
+                FROM responses
+                WHERE status = 'completed'
+                  AND completed_at IS NOT NULL
+                  AND datetime(completed_at) >= datetime('now', ?)
+                GROUP BY day
+                ORDER BY day ASC
+                """,
+                (f"-{days} day",),
+            )
+        ).fetchall()
+        users_map = {row["day"]: int(row["users_count"]) for row in user_rows if row["day"]}
+        responses_map = {
+            row["day"]: int(row["responses_count"]) for row in response_rows if row["day"]
+        }
+        all_days = sorted(set(users_map) | set(responses_map))
+        return [
+            {
+                "day": day,
+                "new_users": users_map.get(day, 0),
+                "responses": responses_map.get(day, 0),
+            }
+            for day in all_days
+        ]
+    finally:
+        await db.close()
+
+
+async def get_average_completion_time() -> timedelta:
+    db = await get_db()
+    try:
+        row = await (
+            await db.execute(
+                """
+                SELECT AVG(strftime('%s', completed_at) - strftime('%s', started_at)) AS avg_seconds
+                FROM responses
+                WHERE status = 'completed'
+                  AND completed_at IS NOT NULL
+                """
+            )
+        ).fetchone()
+        seconds = float(row[0]) if row and row[0] is not None else 0.0
+        return timedelta(seconds=int(seconds))
+    finally:
+        await db.close()
+
+
+async def get_survey_title(survey_id: int) -> str:
+    db = await get_db()
+    try:
+        row = await (
+            await db.execute("SELECT title FROM surveys WHERE id = ? LIMIT 1", (survey_id,))
+        ).fetchone()
+        return str(row[0]) if row else f"#{survey_id}"
+    finally:
+        await db.close()
+
+
+async def get_response_notification_payload(response_id: int) -> dict[str, Any]:
+    db = await get_db()
+    try:
+        row = await (
+            await db.execute(
+                """
+                SELECT
+                    r.survey_id,
+                    s.title AS survey_title,
+                    u.telegram_id,
+                    r.started_at,
+                    r.completed_at,
+                    (
+                        SELECT COUNT(*)
+                        FROM answers a
+                        WHERE a.response_id = r.id
+                    ) AS answers_count,
+                    (
+                        SELECT COUNT(*)
+                        FROM questions q
+                        WHERE q.survey_id = r.survey_id
+                    ) AS questions_count
+                FROM responses r
+                LEFT JOIN users u ON u.id = r.user_id
+                LEFT JOIN surveys s ON s.id = r.survey_id
+                WHERE r.id = ?
+                LIMIT 1
+                """,
+                (response_id,),
+            )
+        ).fetchone()
+        if row is None:
+            return {}
+        return dict(row)
     finally:
         await db.close()
