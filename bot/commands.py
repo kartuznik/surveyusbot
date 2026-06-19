@@ -14,7 +14,6 @@ from aiogram.types import (
 USER_COMMANDS: list[tuple[str, str]] = [
     ("start", "Запустить бота"),
     ("help", "Помощь"),
-    ("demo", "Демо-анкеты"),
 ]
 
 ADMIN_COMMANDS: list[tuple[str, str]] = [
