@@ -1,5 +1,11 @@
 # SurveyBot - Telegram бот для создания анкет
 
+[![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)]()
+[![aiogram 3.x](https://img.shields.io/badge/aiogram-3.x-green.svg)]()
+[![Flask](https://img.shields.io/badge/flask-admin-orange.svg)]()
+[![Docker ready](https://img.shields.io/badge/docker-ready-blue.svg)]()
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)]()
+
 SurveyBot - многофункциональный Telegram-бот для опросов с веб-админкой, самодиагностикой и авто-лечением. Проект подходит для использования в командах, образовательных проектах и бизнес-опросах.
 
 ## Новые функции v1.1.0
