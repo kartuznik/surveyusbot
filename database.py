@@ -609,30 +609,6 @@ async def get_top_surveys(limit: int = 5) -> list[dict[str, Any]]:
         await db.close()
 
 
-async def get_top_users(limit: int = 10) -> list[dict[str, Any]]:
-    db = await get_db()
-    try:
-        rows = await (
-            await db.execute(
-                """
-                SELECT
-                    COALESCE(CAST(u.telegram_id AS TEXT), CAST(r.user_id AS TEXT)) AS user_id,
-                    COUNT(a.id) AS answers_count
-                FROM responses r
-                LEFT JOIN users u ON u.id = r.user_id
-                LEFT JOIN answers a ON a.response_id = r.id
-                GROUP BY user_id
-                ORDER BY answers_count DESC
-                LIMIT ?
-                """,
-                (limit,),
-            )
-        ).fetchall()
-        return [dict(row) for row in rows]
-    finally:
-        await db.close()
-
-
 async def get_daily_activity(days: int = 30) -> list[dict[str, Any]]:
     db = await get_db()
     try:

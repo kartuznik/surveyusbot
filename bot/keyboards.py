@@ -1,13 +1,6 @@
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 
-def get_admin_menu():
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="Создать анкету", callback_data="create_survey")],
-        [InlineKeyboardButton(text="Список анкет", callback_data="list_surveys")]
-    ])
-
-
 def get_question_type_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="Текст", callback_data="type_text")],
