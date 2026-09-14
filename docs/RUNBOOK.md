@@ -27,7 +27,7 @@ systemctl status surveybot-check.timer
 Проверка:
 
 - `/start` в Telegram; для админа — `/health`
-- Админка: `http://<YOUR_HOST>:5000/login`
+- Админка: `http://127.0.0.1:5000/login` через ssh-туннель (`ssh -N -L 5000:127.0.0.1:5000 root@<YOUR_HOST> -p 2222`); наружу порт не открыт
 
 После docs-only изменений restart не нужен. После изменений кода:
 

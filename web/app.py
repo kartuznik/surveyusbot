@@ -40,6 +40,8 @@ load_dotenv(BASE_DIR / ".env")
 ADMIN_WEB_PASSWORD = os.getenv("ADMIN_WEB_PASSWORD", "admin")
 DB_PATH = os.getenv("DB_PATH", "/opt/bots/SurveyBot/data/surveybot.db")
 SECRET_KEY = os.getenv("FLASK_SECRET", "surveybot-web-secret")
+WEB_HOST = os.getenv("WEB_HOST", "127.0.0.1")
+WEB_PORT = int(os.getenv("WEB_PORT", "5000"))
 
 app = Flask(__name__, template_folder="templates")
 app.secret_key = SECRET_KEY
@@ -239,4 +241,5 @@ def webhook_test():
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    # Только петля: панель админская, наружу её пускают ssh-туннелем или reverse proxy с TLS.
+    app.run(host=WEB_HOST, port=WEB_PORT)
